@@ -13,8 +13,8 @@ angular.module('egItemStatus',
 
 .config(function($routeProvider, $locationProvider, $compileProvider) {
     $locationProvider.html5Mode(true);
-    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|mailto|blob):/); // grid export
-	
+    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|blob):/); // grid export
+
     var resolver = {delay : function(egStartup) {return egStartup.go()}};
 
     // search page shows the list view by default
@@ -104,13 +104,6 @@ function($scope , $location , $timeout , egCore , egGridDataProvider , itemSvc) 
         itemSvc.requestItems([$scope.args.copyId]);
     }
 
-    $scope.update_inventory = function() {
-        itemSvc.updateInventory([$scope.args.copyId], null)
-        .then(function(res) {
-            $timeout(function() { location.href = location.href; }, 1000);
-        });
-    }
-
     $scope.attach_to_peer_bib = function() {
         itemSvc.attach_to_peer_bib([{
             id : $scope.args.copyId,
@@ -149,8 +142,7 @@ function($scope , $location , $timeout , egCore , egGridDataProvider , itemSvc) 
     $scope.selectedHoldingsDamaged = function () {
         itemSvc.selectedHoldingsDamaged([{
             id : $scope.args.copyId,
-            barcode : $scope.args.copyBarcode,
-            refresh : true
+            barcode : $scope.args.copyBarcode
         }]);
     }
 
@@ -241,13 +233,8 @@ function($scope , $location , $timeout , egCore , egGridDataProvider , itemSvc) 
  * List view - grid stuff
  */
 .controller('ListCtrl', 
-       ['$scope','$q','$routeParams','$location','$timeout','$window','egCore',
-        'egGridDataProvider','egItem','egUser','$uibModal','egCirc','egConfirmDialog',
-        'egProgressDialog', 'ngToast',
-function($scope , $q , $routeParams , $location , $timeout , $window , egCore , 
-         egGridDataProvider , itemSvc , egUser , $uibModal , egCirc , egConfirmDialog,
-         egProgressDialog, ngToast) {
-
+       ['$scope','$q','$routeParams','$location','$timeout','$window','egCore','egGridDataProvider','egItem','egUser','$uibModal','egCirc','egConfirmDialog',
+function($scope , $q , $routeParams , $location , $timeout , $window , egCore , egGridDataProvider , itemSvc , egUser , $uibModal , egCirc , egConfirmDialog) {
     var copyId = [];
     var cp_list = $routeParams.idList;
     if (cp_list) {
@@ -294,24 +281,18 @@ function($scope , $q , $routeParams , $location , $timeout , $window , egCore ,
                 barcodes.push(line);
             });
 
-            // Serialize copy retrieval since there may be many, many copies.
-            function fetch_next_copy() {
-                var barcode = barcodes.pop();
-                egProgressDialog.increment();
+            if (barcodes.length > 0) {
+                var promises = [];
+                angular.forEach(barcodes, function (b) {
+                    promises.push(itemSvc.fetch(b));
+                });
 
-                if (!barcode) { // All done here.
-                    egProgressDialog.close();
-                    copyGrid.refresh();
-                    copyGrid.selectItems([itemSvc.copies[0].index]);
-                    return;
-                }
-
-                itemSvc.fetch(barcode).then(fetch_next_copy);
-            }
-
-            if (barcodes.length) {
-                egProgressDialog.open({value: 0, max: barcodes.length});
-                fetch_next_copy();
+                $q.all(promises).then(
+                    function() {
+                        copyGrid.refresh();
+                        copyGrid.selectItems([itemSvc.copies[0].index]);
+                    }
+                );
             }
         }
     });
@@ -392,18 +373,6 @@ function($scope , $q , $routeParams , $location , $timeout , $window , egCore ,
         itemSvc.add_copies_to_bucket(copy_list);
     }
 
-    $scope.update_inventory = function() {
-        var copy_list = gatherSelectedHoldingsIds();
-        itemSvc.updateInventory(copy_list, $scope.gridControls.allItems()).then(function(res) {
-            if (res) {
-                $scope.gridControls.allItems(res);
-                ngToast.create(egCore.strings.SUCCESS_UPDATE_INVENTORY);
-            } else {
-                ngToast.warning(egCore.strings.FAIL_UPDATE_INVENTORY);
-            }
-        });
-    }
-
     $scope.need_one_selected = function() {
         var items = $scope.gridControls.selectedItems();
         if (items.length == 1) return false;
@@ -474,33 +443,6 @@ function($scope , $q , $routeParams , $location , $timeout , $window , egCore ,
         itemSvc.spawnHoldingsAdd(copyGrid.selectedItems(),false,true);
     }
 
-    $scope.selectedHoldingsCopyAlertsAdd = function(items) {
-        var copy_ids = [];
-        angular.forEach(items, function(item) {
-            if (item.id) copy_ids.push(item.id);
-        });
-        egCirc.add_copy_alerts(copy_ids).then(function() {
-            // update grid items?
-        });
-    }
-
-    $scope.selectedHoldingsCopyAlertsEdit = function(items) {
-        var copy_ids = [];
-        angular.forEach(items, function(item) {
-            if (item.id) copy_ids.push(item.id);
-        });
-        egCirc.manage_copy_alerts(copy_ids).then(function() {
-            // update grid items?
-        });
-    }
-
-    $scope.gridCellHandlers = {};
-    $scope.gridCellHandlers.copyAlertsEdit = function(id) {
-        egCirc.manage_copy_alerts([id]).then(function() {
-            // update grid items?
-        });
-    };
-
     $scope.showBibHolds = function () {
         angular.forEach(gatherSelectedRecordIds(), function (r) {
             var url = egCore.env.basePath + 'cat/catalog/record/' + r + '/holds';
@@ -554,10 +496,6 @@ function($scope , $q , $routeParams , $location , $timeout , $window , egCore ,
         });
     }
 
-    $scope.show_in_catalog = function(){
-        itemSvc.show_in_catalog(copyGrid.selectedItems());
-    }
-
     if (copyId.length > 0) {
         itemSvc.fetch(null,copyId).then(
             function() {
@@ -572,8 +510,8 @@ function($scope , $q , $routeParams , $location , $timeout , $window , egCore ,
  * Detail view -- shows one copy
  */
 .controller('ViewCtrl', 
-       ['$scope','$q','$location','$routeParams','$timeout','$window','egCore','egItem','egBilling','egCirc',
-function($scope , $q , $location , $routeParams , $timeout , $window , egCore , itemSvc , egBilling , egCirc) {
+       ['$scope','$q','$location','$routeParams','$timeout','$window','egCore','egItem','egBilling',
+function($scope , $q , $location , $routeParams , $timeout , $window , egCore , itemSvc , egBilling) {
     var copyId = $routeParams.id;
     $scope.args.copyId = copyId;
     $scope.tab = $routeParams.tab || 'summary';
@@ -589,9 +527,6 @@ function($scope , $q , $location , $routeParams , $timeout , $window , egCore , 
 
     // use the cached record info
     if (itemSvc.copy) {
-        $scope.copy_alert_count = itemSvc.copy.copy_alerts().filter(function(aca) {
-            return !aca.ack_time();
-        }).length;
         $scope.recordId = itemSvc.copy.call_number().record().id();
         $scope.args.recordId = $scope.recordId;
         $scope.args.cnId = itemSvc.copy.call_number().id();
@@ -614,12 +549,6 @@ function($scope , $q , $location , $routeParams , $timeout , $window , egCore , 
         // regardless of whether it matches the current item.
         if (!barcode && itemSvc.copy && itemSvc.copy.id() == copyId) {
             $scope.copy = itemSvc.copy;
-            if (itemSvc.latest_inventory && itemSvc.latest_inventory.copy() == copyId) {
-                $scope.latest_inventory = itemSvc.latest_inventory;
-            }
-            $scope.copy_alert_count = itemSvc.copy.copy_alerts().filter(function(aca) {
-                return !aca.ack_time();
-            }).length;
             $scope.recordId = itemSvc.copy.call_number().record().id();
             $scope.args.recordId = $scope.recordId;
             $scope.args.cnId = itemSvc.copy.call_number().id();
@@ -649,15 +578,9 @@ function($scope , $q , $location , $routeParams , $timeout , $window , egCore , 
 
             var copy = res.copy;
             itemSvc.copy = copy;
-            if (res.latest_inventory) itemSvc.latest_inventory = res.latest_inventory;
 
 
             $scope.copy = copy;
-            $scope.latest_inventory = res.latest_inventory;
-            $scope.copy_alert_count = copy.copy_alerts().filter(function(aca) {
-                return !aca.ack_time();
-            }).length;
-console.debug($scope.copy_alert_count);
             $scope.recordId = copy.call_number().record().id();
             $scope.args.recordId = $scope.recordId;
             $scope.args.cnId = itemSvc.copy.call_number().id();
@@ -701,85 +624,63 @@ console.debug($scope.copy_alert_count);
         return deferred.promise;
     }
 
-    // load the two most recent circulations in /circs tab
-    function loadCurrentCirc() {
+    // if loadPrev load the two most recent circulations
+    function loadCurrentCirc(loadPrev) {
         delete $scope.circ;
         delete $scope.circ_summary;
         delete $scope.prev_circ_summary;
         delete $scope.prev_circ_usr;
         if (!copyId) return;
         
-        var copy_org =
-            itemSvc.copy.call_number().id() == -1 ?
-            itemSvc.copy.circ_lib().id() :
-            itemSvc.copy.call_number().owning_lib().id();
-
-        // since a user can still view patron checkout history here, check perms
-        egCore.perm.hasPermAt('VIEW_COPY_CHECKOUT_HISTORY', true)
-        .then(function(orgIds){
-            if(orgIds.indexOf(copy_org) == -1){
-                console.warn('User is not allowed to view circ history!');
-                $q.when(0);
+        egCore.pcrud.search('aacs', 
+            {target_copy : copyId},
+            {   flesh : 2,
+                flesh_fields : {
+                    aacs : [
+                        'usr',
+                        'workstation',                                         
+                        'checkin_workstation',                                 
+                        'duration_rule',                                       
+                        'max_fine_rule',                                       
+                        'recurring_fine_rule'   
+                    ],
+                    au : ['card']
+                },
+                order_by : {aacs : 'xact_start desc'}, 
+                limit :  1
             }
 
-            return fetchMaxCircHistory();
-        })
-        .then(function(maxHistCount){
+        ).then(null, null, function(circ) {
+            $scope.circ = circ;
 
-            if (!maxHistCount) $scope.isMaxCircHistoryZero = true;
-
-            egCore.pcrud.search('aacs',
-                {target_copy : copyId},
-                {   flesh : 2,
-                    flesh_fields : {
-                        aacs : [
-                            'usr',
-                            'workstation',
-                            'checkin_workstation',
-                            'duration_rule',
-                            'max_fine_rule',
-                            'recurring_fine_rule'
-                        ],
-                        au : ['card']
-                    },
-                    order_by : {aacs : 'xact_start desc'},
-                    limit :  1
-                }
-
-            ).then(null, null, function(circ) {
-                $scope.circ = circ;
-
-                if (!circ) return $q.when();
-
-                // load the chain for this circ
-                egCore.net.request(
-                    'open-ils.circ',
-                    'open-ils.circ.renewal_chain.retrieve_by_circ.summary',
-                    egCore.auth.token(), $scope.circ.id()
-                ).then(function(summary) {
-                    $scope.circ_summary = summary;
-                });
-
-                if (maxHistCount <= 1) return;
-
-                // load the chain for the previous circ, plus the user
-                egCore.net.request(
-                    'open-ils.circ',
-                    'open-ils.circ.prev_renewal_chain.retrieve_by_circ.summary',
-                    egCore.auth.token(), $scope.circ.id()
-
-                ).then(null, null, function(summary) {
-                    $scope.prev_circ_summary = summary.summary;
-
-                    if (summary.usr) { // aged circs have no 'usr'.
-                        egCore.pcrud.retrieve('au', summary.usr,
-                            {flesh : 1, flesh_fields : {au : ['card']}})
-
-                        .then(function(user) { $scope.prev_circ_usr = user });
-                    }
-                });
+            // load the chain for this circ
+            egCore.net.request(
+                'open-ils.circ',
+                'open-ils.circ.renewal_chain.retrieve_by_circ.summary',
+                egCore.auth.token(), $scope.circ.id()
+            ).then(function(summary) {
+                $scope.circ_summary = summary;
             });
-        })
+
+            if (!loadPrev) return;
+
+            // load the chain for the previous circ, plus the user
+            egCore.net.request(
+                'open-ils.circ',
+                'open-ils.circ.prev_renewal_chain.retrieve_by_circ.summary',
+                egCore.auth.token(), $scope.circ.id()
+
+            ).then(null, null, function(summary) {
+                $scope.prev_circ_summary = summary.summary;
+
+                if (summary.usr) { // aged circs have no 'usr'.
+                    egCore.pcrud.retrieve('au', summary.usr,
+                        {flesh : 1, flesh_fields : {au : ['card']}})
+
+                    .then(function(user) { $scope.prev_circ_usr = user });
+                }
+            });
+        });
     }
 
     var maxHistory;
@@ -789,7 +690,7 @@ console.debug($scope.copy_alert_count);
             'circ.item_checkout_history.max')
         .then(function(set) {
             maxHistory = set['circ.item_checkout_history.max'] || 4;
-            return Number(maxHistory);
+            return maxHistory;
         });
     }
 
@@ -816,14 +717,13 @@ console.debug($scope.copy_alert_count);
         });
     }
 
-    // load data for /circ_list tab
     function loadCircHistory() {
         $scope.circ_list = [];
 
         var copy_org = 
             itemSvc.copy.call_number().id() == -1 ?
             itemSvc.copy.circ_lib().id() :
-            itemSvc.copy.call_number().owning_lib().id();
+            itemSvc.copy.call_number().owning_lib().id()
 
         // there is an extra layer of permissibility over circ
         // history views
@@ -837,30 +737,25 @@ console.debug($scope.copy_alert_count);
 
             return fetchMaxCircHistory();
 
-        }).then(function(maxHistCount) {
+        }).then(function(count) {
 
-            if(!maxHistCount) $scope.isMaxCircHistoryZero = true;
-
-            egCore.pcrud.search('aacs',
+            egCore.pcrud.search('aacs', 
                 {target_copy : copyId},
                 {   flesh : 2,
                     flesh_fields : {
                         aacs : [
                             'usr',
-                            'workstation',
-                            'checkin_workstation',
-                            'recurring_fine_rule'
+                            'workstation',                                         
+                            'checkin_workstation',                                 
+                            'recurring_fine_rule'   
                         ],
                         au : ['card']
                     },
-                    order_by : {aacs : 'xact_start desc'},
-                    // fetch at least one to see if copy ever circulated
-                    limit : $scope.isMaxCircHistoryZero ? 1 : maxHistCount
+                    order_by : {aacs : 'xact_start desc'}, 
+                    limit :  count
                 }
 
             ).then(null, null, function(circ) {
-
-                $scope.circ = circ;
 
                 // flesh circ_lib locally
                 circ.circ_lib(egCore.org.get(circ.circ_lib()));
@@ -893,29 +788,15 @@ console.debug($scope.copy_alert_count);
                 return c.year() == new Date().getFullYear();
             });
 
-            $scope.total_circs_this_year = (function() {
-                total = 0;
-                if (this_year.length == 2) {
-                    total = (Number(this_year[0].count()) + Number(this_year[1].count()));
-                } else if (this_year.length == 1) {
-                    total = Number(this_year[0].count());
-                }
-                return total;
-            })();
+            $scope.total_circs_this_year = 
+                this_year.length ? this_year[0].count() : 0;
 
             var prev_year = counts.filter(function(c) {
                 return c.year() == new Date().getFullYear() - 1;
             });
 
-            $scope.total_circs_prev_year = (function() {
-                total = 0;
-                if (prev_year.length == 2) {
-                    total = (Number(prev_year[0].count()) + Number(prev_year[1].count()));
-                } else if (prev_year.length == 1) {
-                    total = Number(prev_year[0].count());
-                }
-                return total;
-            })();
+            $scope.total_circs_prev_year = 
+                prev_year.length ? prev_year[0].count() : 0;
 
         });
     }
@@ -947,20 +828,16 @@ console.debug($scope.copy_alert_count);
         });
     }
 
-    function loadMostRecentTransit() {
+    function loadTransits() {
         delete $scope.transit;
         delete $scope.hold_transit;
         if (!copyId) return;
 
         egCore.pcrud.search('atc', 
             {target_copy : copyId},
-            {
-                order_by : {atc : 'source_send_time DESC'},
-                limit : 1
-            }
+            {order_by : {atc : 'source_send_time DESC'}}
 
         ).then(null, null, function(transit) {
-            // use progress callback since we'll get up to one result
             $scope.transit = transit;
             transit.source(egCore.org.get(transit.source()));
             transit.dest(egCore.org.get(transit.dest()));
@@ -977,7 +854,7 @@ console.debug($scope.copy_alert_count);
                 break;
 
             case 'circs':
-                loadCurrentCirc();
+                loadCurrentCirc(true);
                 break;
 
             case 'circ_list':
@@ -986,7 +863,7 @@ console.debug($scope.copy_alert_count);
 
             case 'holds':
                 loadHolds()
-                loadMostRecentTransit();
+                loadTransits();
                 break;
 
             case 'triggered_events':
@@ -1017,19 +894,6 @@ console.debug($scope.copy_alert_count);
         }
 
         return;
-    }
-
-    $scope.addCopyAlerts = function(copy_id) {
-        egCirc.add_copy_alerts([copy_id]).then(function() {
-            // force a refresh
-            loadCopy($scope.copy.barcode()).then(loadTabData);
-        });
-    }
-    $scope.manageCopyAlerts = function(copy_id) {
-        egCirc.manage_copy_alerts([copy_id]).then(function() {
-            // force a refresh
-            loadCopy($scope.copy.barcode()).then(loadTabData);
-        });
     }
 
     $scope.context.toggleDisplay = function() {

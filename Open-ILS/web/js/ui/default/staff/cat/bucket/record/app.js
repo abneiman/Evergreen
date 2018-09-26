@@ -17,8 +17,8 @@ angular.module('egCatRecordBuckets',
 
 .config(function($routeProvider, $locationProvider, $compileProvider) {
     $locationProvider.html5Mode(true);
-    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|mailto|blob):/); // grid export
-	
+    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|blob):/); // grid export
+
     var resolver = {delay : function(egStartup) {return egStartup.go()}};
 
     $routeProvider.when('/cat/bucket/record/search/:id', {
@@ -309,7 +309,6 @@ function($scope,  $location,  $q,  $timeout,  $uibModal,
     $scope.openCreateBucketDialog = function() {
         $uibModal.open({
             templateUrl: './cat/bucket/share/t_bucket_create',
-            backdrop: 'static',
             controller: 
                 ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
                 $scope.focusMe = true;
@@ -334,7 +333,6 @@ function($scope,  $location,  $q,  $timeout,  $uibModal,
     $scope.openEditBucketDialog = function() {
         $uibModal.open({
             templateUrl: './cat/bucket/share/t_bucket_edit',
-            backdrop: 'static',
             controller: 
                 ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
                 $scope.focusMe = true;
@@ -362,7 +360,6 @@ function($scope,  $location,  $q,  $timeout,  $uibModal,
     $scope.openDeleteBucketDialog = function() {
         $uibModal.open({
             templateUrl: './cat/bucket/share/t_bucket_delete',
-            backdrop: 'static',
             controller : 
                 ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
                 $scope.bucket = function() { return bucketSvc.currentBucket }
@@ -382,7 +379,6 @@ function($scope,  $location,  $q,  $timeout,  $uibModal,
     $scope.openSharedBucketDialog = function() {
         $uibModal.open({
             templateUrl: './cat/bucket/share/t_load_shared',
-            backdrop: 'static',
             controller : 
                 ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
                 $scope.focusMe = true;
@@ -405,7 +401,6 @@ function($scope,  $location,  $q,  $timeout,  $uibModal,
     $scope.openExportBucketDialog = function() {
         $uibModal.open({
             templateUrl: './cat/bucket/record/t_bucket_export',
-            backdrop: 'static',
             controller : 
                 ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
                 $scope.args = {format : 'XML', encoding : 'UTF-8'}; // defaults
@@ -561,7 +556,6 @@ function($scope,  $q , $routeParams,  bucketSvc,  egCore,  $window,
     $scope.openRecordMergeDialog = function(records) {
         $uibModal.open({
             templateUrl: './cat/bucket/record/t_merge_records',
-            backdrop: 'static',
             size: 'lg',
             windowClass: 'eg-wide-modal',
             controller:
@@ -657,7 +651,6 @@ function($scope,  $q , $routeParams,  bucketSvc,  egCore,  $window,
 
                     $uibModal.open({
                         templateUrl: './cat/bucket/record/t_edit_lead_record',
-                        backdrop: 'static',
                         size: 'lg',
                         controller:
                             ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
@@ -762,7 +755,6 @@ function($scope,  $q , $routeParams,  bucketSvc,  egCore,  $window,
                 if (failures.length) {
                     $uibModal.open({
                         templateUrl: './cat/bucket/record/t_records_not_deleted',
-                        backdrop: 'static',
                         controller :
                             ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
                             $scope.failures = failures;

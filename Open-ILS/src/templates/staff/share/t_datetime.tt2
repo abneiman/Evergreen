@@ -3,18 +3,15 @@
     <!-- Date Picker -->
     <div class="input-group">
       <input type="text"
-        id="{{id}}"
         class="form-control"
         ng-show="!hideDatePicker"
         uib-datepicker-popup="{{date_format}}"
         is-open="datePickerIsOpen"
-        datepicker-options="options"
         ng-model="ngModel"
         ng-change="ngChange"
         ng-blur="ngBlur"
         ng-disabled="ngDisabled"
         ng-required="ngRequired"
-        focus-me="focusMe"
         close-text="{{closeText}}"/>
       <span class="input-group-btn">
         <button type="button" class="btn btn-default"
@@ -29,20 +26,15 @@
       not line up horizontally very well with the date picker -->
   <div>
     <span>
-      <div uib-timepicker
-        ng-class="{hidden:!showTimePicker}"
-        ng-hide="hideTimePicker"
+      <uib-timepicker
+        ng-show="showTimePicker"
         ng-model="ngModel"
         ng-disabled="ngDisabled"
         ng-required="ngRequired"
         ng-blur="ngBlur"
         ng-change="ngChange">
-      </div>
+      </uib-timepicker>
     </span>
-  </div>
-
-  <div>
-    <span ng-show="outOfRange" class="label label-danger">[% l('Input is out of range.') %]</span>
   </div>
 </div>
 

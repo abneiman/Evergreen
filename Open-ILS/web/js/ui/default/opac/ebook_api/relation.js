@@ -19,7 +19,6 @@ Relation.prototype.getCheckouts = function(callback) {
                 console.log('retrieved checkouts for patron');
                 rel.checkouts = [];
                 dojo.forEach(resp.content(), function(checkout) {
-                    checkout.vendor = rel.vendor;
                     rel.checkouts.push(checkout);
                 });
                 return callback(rel);
@@ -40,7 +39,6 @@ Relation.prototype.getHolds = function(callback) {
             if (resp) {
                 console.log('retrieved holds for patron');
                 dojo.forEach(resp.content(), function(hold) {
-                    hold.vendor = rel.vendor;
                     if (hold.is_ready === 1) {
                         rel.holds_ready.push(hold);
                     } else {
@@ -66,11 +64,9 @@ Relation.prototype.getTransactions = function(callback) {
                 console.log('retrieved holds for patron');
                 var xacts = resp.content();
                 dojo.forEach(xacts.checkouts, function(checkout) {
-                    checkout.vendor = rel.vendor;
                     rel.checkouts.push(checkout);
                 });
                 dojo.forEach(xacts.holds, function(hold) {
-                    hold.vendor = rel.vendor;
                     if (hold.is_ready === 1) {
                         rel.holds_ready.push(hold);
                     } else {

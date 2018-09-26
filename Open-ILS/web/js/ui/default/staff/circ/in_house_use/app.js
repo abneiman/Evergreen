@@ -3,15 +3,14 @@ angular.module('egInHouseUseApp',
 
 .config(function($routeProvider, $locationProvider, $compileProvider) {
     $locationProvider.html5Mode(true);
-    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|mailto|blob):/); // grid export
+    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|blob):/); // grid export
+
 
 })
 
 .controller('InHouseUseCtrl',
-       ['$scope','egCore','egGridDataProvider','egConfirmDialog', 
-        'egAlertDialog','egBibDisplay',
-function($scope , egCore , egGridDataProvider , egConfirmDialog, 
-         egAlertDialog , egBibDisplay) {
+       ['$scope','egCore','egGridDataProvider','egConfirmDialog', 'egAlertDialog',
+function($scope,  egCore,  egGridDataProvider , egConfirmDialog, egAlertDialog) {
 
     var countCap;
     var countMax;
@@ -46,8 +45,8 @@ function($scope , egCore , egGridDataProvider , egConfirmDialog,
         });
     });
 
-    $scope.bcFocus = true;
-    $scope.args = {noncat_type : 'barcode', num_uses : 1, needsCountWarnModal: false };
+    $scope.useFocus = true;
+    $scope.args = {noncat_type : 'barcode', num_uses : 1};
     var checkouts = [];
 
     var provider = egGridDataProvider.instance({});
@@ -63,25 +62,7 @@ function($scope , egCore , egGridDataProvider , egConfirmDialog,
         return type ? type.name() : null;
     }
 
-    $scope.onNumUsesChanged = function(){
-        $scope.args.needsCountWarnModal = countWarn < $scope.args.num_uses;
-    }
-
-    $scope.checkout = function(args){
-        if ($scope.args.needsCountWarnModal) {
-            // show modal to allow warning/confirmation
-            egConfirmDialog.open(egCore.strings.CONFIRM_IN_HOUSE_NUM_USES_COUNT_TITLE, '',
-                { num_uses: $scope.args.num_uses }
-            ).result.then(function(){
-                $scope.args.needsCountWarnModal = false
-                $scope.checkoutStart(args)
-            });
-        } else {
-            $scope.checkoutStart(args);
-        }
-    }
-
-    $scope.checkoutStart = function(args) {
+    $scope.checkout = function(args) {
         $scope.copyNotFound = false;
 
         var coArgs = {
@@ -95,12 +76,9 @@ function($scope , egCore , egGridDataProvider , egConfirmDialog,
                 {barcode : args.barcode, deleted : 'f'},
                 {   flesh : 3, 
                     flesh_fields : {
-                        acp : ['call_number','location','status'],
-                        acn : ['record', 'prefix', 'suffix'],
-                        // We don't need to display a wide range of bib
-                        // fields in this UI.  Fetch the flat display since
-                        // it requires less DB-side munging (and as an example).  
-                        bre : ['flat_display_entries']
+                        acp : ['call_number','location'],
+                        acn : ['record'],
+                        bre : ['simple_record']
                     },
                     select : { bre : ['id'] } // avoid fleshing MARC
                 }
@@ -113,11 +91,6 @@ function($scope , egCore , egGridDataProvider , egConfirmDialog,
                 }
 
                 coArgs.copyid = copy.id();
-
-                copy.call_number().record().flat_display_entries(
-                    egBibDisplay.mfdeToHash(
-                        copy.call_number().record().flat_display_entries())
-                );
 
                 // LP1507807: Display the copy alert if the setting is on.
                 if ($scope.copyAlert && copy.alert_message()) {
@@ -162,7 +135,7 @@ function($scope , egCore , egGridDataProvider , egConfirmDialog,
             var item = {num_uses : resp.length};
             item.copy = data.copy;
             item.title = data.title || 
-                data.copy.call_number().record().flat_display_entries().title;
+                data.copy.call_number().record().simple_record().title();
             item.index = checkouts.length;
 
             checkouts.unshift(item);

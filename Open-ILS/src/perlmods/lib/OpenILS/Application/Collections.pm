@@ -3,7 +3,7 @@ use strict; use warnings;
 use OpenSRF::EX qw(:try);
 use OpenILS::Application::AppUtils;
 use OpenSRF::Utils::Logger qw(:logger);
-use OpenILS::Utils::DateTime qw/:datetime/;
+use OpenSRF::Utils qw/:datetime/;
 use OpenILS::Application;
 use OpenILS::Utils::Fieldmapper;
 use base 'OpenILS::Application';

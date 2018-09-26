@@ -4,11 +4,8 @@
   </div>
 </div>
 
-<div class="flex-row">
-  <div class="pad-right-min">[% l('Home Library: ' ) %]</div>
-  <eg-org-selector selected="context_org"></eg-org-selector>
-  <div class="flex-1"></div>
-</div>
+<span>[% l('Home Library: ' ) %]</span>
+<span><eg-org-selector selected="context_org"></eg-org-selector></span>
 <hr/>
 
 <eg-grid

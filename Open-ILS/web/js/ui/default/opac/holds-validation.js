@@ -60,24 +60,13 @@ function validateMethodSelections (alertMethodCboxes) {
     return { isValid: isFormOK, culpritNames : culprits };
 }
 
-function confirmMultipleHolds() {
-    var result = true;
-    var numSelect = document.getElementById("num_copies");
-    if (numSelect) {
-        var num = parseInt(numSelect.value);
-        if (num > 1) {
-            result = window.confirm(eg_opac_i18n.EG_MULTIHOLD_MESSAGE.format(num));
-        }
-    }
-    return result;
-}
-
 function validateHoldForm() {
     var res = validateMethodSelections(document.getElementsByClassName("hold-alert-method"));
-    if (res.isValid) {
-        return confirmMultipleHolds();
+    if (res.isValid)
+    {
+        return true;
     } else {
-        alert(eg_opac_i18n.EG_MISSING_REQUIRED_INPUT);
+        alert ("Please complete hold notification method info.");
         res.culpritNames.forEach(function(n){
             document.getElementsByName(n)[0].style.backgroundColor  = "yellow";
         });

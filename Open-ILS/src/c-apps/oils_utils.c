@@ -393,16 +393,16 @@ jsonObject* oilsUtilsFetchUserByBarcode(osrfMethodContext* ctx, const char* barc
 	if(!card)
 		return NULL;   // No such card
 
-	// Get the user's id as a long
+	// Get the user's id as a double
 	char* usr = oilsFMGetString(card, "usr");
 	jsonObjectFree(card);
 	if(!usr)
 		return NULL;   // No user id (shouldn't happen)
-	long iusr = strtol(usr, NULL, 10);
+	double iusr = strtod(usr, NULL);
 	free(usr);
 
 	// Look up the user in actor.usr
-	params = jsonParseFmt("[%d]", iusr);
+	params = jsonParseFmt("[%f]", iusr);
 	jsonObject* user = oilsUtilsQuickReqCtx(
 		ctx, "open-ils.cstore", "open-ils.cstore.direct.actor.user.retrieve", params);
 

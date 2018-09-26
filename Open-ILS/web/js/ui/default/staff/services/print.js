@@ -58,12 +58,9 @@ function($q , $window , $timeout , $http , egHatch , egAuth , egIDL , egOrg , eg
     service.fleshPrintScope = function(scope) {
         if (!scope) scope = {};
         scope.today = new Date().toISOString();
-
-        if (!lf.isOffline) {
-            scope.staff = egIDL.toHash(egAuth.user());
-            scope.current_location = 
-                egIDL.toHash(egOrg.get(egAuth.user().ws_ou()));
-        }
+        scope.staff = egIDL.toHash(egAuth.user());
+        scope.current_location = 
+            egIDL.toHash(egOrg.get(egAuth.user().ws_ou()));
 
         return service.fetch_includes(scope);
     }
@@ -156,17 +153,20 @@ function($q , $window , $timeout , $http , egHatch , egAuth , egIDL , egOrg , eg
                   content;
 
         }).then(function(content) {
-
-            // Ingest the content into the page DOM.
-            return service.ingest_print_content(type, content, printScope);
-
-        }).then(function(html) { 
-
-            // Note browser ignores print context
-            service.last_print.content = html;
+            service.last_print.content = content;
             service.last_print.content_type = type;
+            service.last_print.printScope = printScope
+
             egHatch.setItem('eg.print.last_printed', service.last_print);
 
+            // Ingest the content into the page DOM.
+            return service.ingest_print_content(
+                service.last_print.content_type,
+                service.last_print.content,
+                service.last_print.printScope
+            );
+
+        }).then(function() { 
             $window.print();
         });
     }
@@ -189,7 +189,9 @@ function($q , $window , $timeout , $http , egHatch , egAuth , egIDL , egOrg , eg
                 } else {
                     promise.then(function () {
                         service.ingest_print_content(
-                            null, null, null, service.last_print.content
+                            service.last_print.content_type,
+                            service.last_print.content,
+                            service.last_print.printScope
                         ).then(function() { $window.print() });
                     });
                 }
@@ -218,13 +220,12 @@ function($q , $window , $timeout , $http , egHatch , egAuth , egIDL , egOrg , eg
             var path = service.template_base_path + name;
             console.debug('fetching template ' + path);
 
-            $http.get(path).then(
-                function(data) { deferred.resolve(data.data) },
-                function() {
-                    console.error('unable to locate print template: ' + name);
-                    deferred.reject();
-                }
-            );
+            $http.get(path)
+            .success(function(data) { deferred.resolve(data) })
+            .error(function() {
+                console.error('unable to locate print template: ' + name);
+                deferred.reject();
+            });
         });
 
         return deferred.promise;
@@ -295,19 +296,7 @@ function($q , $window , $timeout , $http , egHatch , egAuth , egIDL , egOrg , eg
                 // For local printing, this lets us print directly from the
                 // DOM with print CSS.
                 // Returns a promise reolved with the compiled HTML as a string.
-                //
-                // If a pre-compiled HTML string is provided, it's inserted
-                // as-is into the DOM for browser printing without any 
-                // additional interpolation.  This is useful for reprinting,
-                // previously compiled content.
-                egPrint.ingest_print_content = 
-                    function(type, content, printScope, compiledHtml) {
-
-                    if (compiledHtml) {
-                        $scope.elm.html(compiledHtml);
-                        return $q.when(compiledHtml);
-                    }
-                        
+                egPrint.ingest_print_content = function(type, content, printScope) {
                     $scope.elm.html(content);
 
                     var sub_scope = $scope.$new(true);

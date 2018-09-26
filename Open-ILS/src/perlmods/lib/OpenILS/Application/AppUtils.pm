@@ -2096,38 +2096,8 @@ sub basic_opac_copy_query {
         },
 
         from => {
-            acp => [
-                {acn => { # 0
-                    join => {
-                        acnp => { fkey => 'prefix' },
-                        acns => { fkey => 'suffix' }
-                    },
-                    filter => [
-                        {deleted => 'f'},
-                        ($rec_id ? {record => $rec_id} : ())
-                    ],
-                }},
-                'aou', # 1
-                {circ => { # 2 If the copy is circulating, retrieve the open circ
-                    type => 'left',
-                    filter => {checkin_time => undef}
-                }},
-                {acpl => { # 3
-                    filter => {
-                        deleted => 'f',
-                        ($staff ? () : ( opac_visible => 't' )),
-                    },
-                }},
-                {ccs => { # 4
-                    ($staff ? () : (filter => { opac_visible => 't' }))
-                }},
-                {acpm => { # 5
-                    type => 'left',
-                    join => {
-                        bmp => { type => 'left', filter => { deleted => 'f' } }
-                    }
-                }},
-                ($iss_id ? { # 6 
+            acp => {
+                ($iss_id ? (
                     sitem => {
                         fkey => 'id',
                         field => 'unit',
@@ -2136,8 +2106,38 @@ sub basic_opac_copy_query {
                             sstr => { }
                         }
                     }
-                } : ())
-            ]
+                ) : ()),
+                acn => {
+                    join => {
+                        acnp => { fkey => 'prefix' },
+                        acns => { fkey => 'suffix' }
+                    },
+                    filter => [
+                        {deleted => 'f'},
+                        ($rec_id ? {record => $rec_id} : ())
+                    ],
+                },
+                circ => { # If the copy is circulating, retrieve the open circ
+                    type => 'left',
+                    filter => {checkin_time => undef}
+                },
+                acpl => {
+                    filter => {
+                        deleted => 'f',
+                        ($staff ? () : ( opac_visible => 't' )),
+                    },
+                },
+                ccs => {
+                    ($staff ? () : (filter => { opac_visible => 't' }))
+                },
+                aou => {},
+                acpm => {
+                    type => 'left',
+                    join => {
+                        bmp => { type => 'left', filter => { deleted => 'f' } }
+                    }
+                }
+            }
         },
 
         where => {
@@ -2277,14 +2277,6 @@ sub unique_unnested_numbers {
                 map { substr($_, 1, -1) } @_
         )
     );
-}
-
-# Given a list of numbers, turn them into a PG array, skipping undef's
-sub intarray2pgarray {
-    my $class = shift;
-    no warnings 'numeric';
-
-    return '{' . join( ',', map(int, grep { defined && /^\d+$/ } @_) ) . '}';
 }
 
 # Check if a transaction should be left open or closed. Close the

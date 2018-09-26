@@ -251,7 +251,7 @@ sub lock_file_release {
 
 sub lock_file_test {
     if (open FH, $config{lock_file}) {
-        my $pid = <FH>;
+        my $pid = <>;
         chomp $pid;
         close FH;
 

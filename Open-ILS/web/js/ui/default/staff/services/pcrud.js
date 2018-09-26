@@ -91,9 +91,7 @@ angular.module('egCoreMod')
             this.session.disconnect();
         };
 
-        this.retrieve = function(fm_class, pkey, pcrud_ops, req_ops) {
-            req_ops = req_ops || {};
-            this.authoritative = req_ops.authoritative;
+        this.retrieve = function(fm_class, pkey, pcrud_ops) {
             return this._dispatch(
                 'open-ils.pcrud.retrieve.' + fm_class,
                 [egAuth.token(), pkey, pcrud_ops]
@@ -108,7 +106,6 @@ angular.module('egCoreMod')
 
         this.search = function (fm_class, search, pcrud_ops, req_ops) {
             req_ops = req_ops || {};
-            this.authoritative = req_ops.authoritative;
 
             var return_type = req_ops.idlist ? 'id_list' : 'search';
             var method = 'open-ils.pcrud.' + return_type + '.' + fm_class;
@@ -182,7 +179,7 @@ angular.module('egCoreMod')
                 },
 
                 // main body error handler
-                function() {deferred.reject()}, 
+                function() {}, 
 
                 // main body notify() handler
                 function(data) {deferred.notify(data)}
@@ -278,7 +275,6 @@ angular.module('egCoreMod')
                 if (action == 'apply') {
                     // object does not need updating; move along
                     this._CUD_next_request();
-                    return;
                 }
             }
 
@@ -291,8 +287,7 @@ angular.module('egCoreMod')
                     self.cud_last = data;
                     self.cud_deferred.notify(data);
                     self._CUD_next_request();
-                },
-                self.cud_deferred.reject
+                }
             );
            
         };

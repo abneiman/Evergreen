@@ -13,25 +13,24 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
     };
 
     service.flesh = {   
-        flesh : 4,
+        flesh : 3, 
         flesh_fields : {
-            acp : ['call_number','location','status','floating','circ_modifier',
-                'age_protect','circ_lib','copy_alerts', 'creator', 'editor', 'circ_as_type', 'latest_inventory'],
+            acp : ['call_number','location','status','location','floating','circ_modifier',
+                'age_protect','circ_lib'],
             acn : ['record','prefix','suffix','label_class'],
-            bre : ['simple_record','creator','editor'],
-            alci : ['inventory_workstation']
+            bre : ['simple_record','creator','editor']
         },
         select : { 
             // avoid fleshing MARC on the bre
             // note: don't add simple_record.. not sure why
-            bre : ['id','tcn_value','creator','editor', 'create_date', 'edit_date'],
+            bre : ['id','tcn_value','creator','editor'],
         } 
     }
 
     service.circFlesh = {
         flesh : 2,
         flesh_fields : {
-            combcirc : [
+            circ : [
                 'usr',
                 'workstation',
                 'checkin_workstation',
@@ -42,7 +41,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
             ],
             au : ['card']
         },
-        order_by : {combcirc : 'xact_start desc'},
+        order_by : {circ : 'xact_start desc'},
         limit :  1
     }
 
@@ -63,7 +62,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
     }
 
     service.getCirc = function(id) {
-        return egCore.pcrud.search('combcirc', { target_copy : id },
+        return egCore.pcrud.search('aacs', { target_copy : id },
             service.circFlesh).then(function(circ) {return circ});
     }
 
@@ -100,10 +99,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
                     return copyData;
                 });
         }
-
         return fetchCopy(barcode, id).then(function(res) {
-
-            if(!res.copy) { return $q.when(); }
             return fetchCirc(copyData.copy).then(function(res) {
                 if (copyData.circ) {
                     return fetchSummary(copyData.circ).then(function() {
@@ -126,12 +122,12 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
 
         return service.retrieveCopyData(barcode, id)
         .then(function(copyData) {
-            if(!copyData) { return $q.when(); }
             //Make sure we're getting a completed copyData - no plain acp or circ objects
             if (copyData.circ) {
                 // flesh circ_lib locally
                 copyData.circ.circ_lib(egCore.org.get(copyData.circ.circ_lib()));
-
+                copyData.circ.checkin_workstation(
+                    egCore.org.get(copyData.circ.checkin_workstation()));
             }
             var flatCopy;
 
@@ -141,9 +137,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
                     function(c) {return c.id == copyData.copy.id()})[0];
             }
 
-            // flesh acn.owning_lib
-            copyData.copy.call_number().owning_lib(egCore.org.get(copyData.copy.call_number().owning_lib()));
-
             if (!flatCopy) {
                 flatCopy = egCore.idl.toHash(copyData.copy, true);
 
@@ -152,17 +145,8 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
                     flatCopy._circ_summary = egCore.idl.toHash(copyData.circ_summary, true);
                     flatCopy._circ_lib = copyData.circ.circ_lib();
                     flatCopy._duration = copyData.circ.duration();
-                    flatCopy._circ_ws = flatCopy._circ_summary.last_renewal_workstation ?
-                                        flatCopy._circ_summary.last_renewal_workstation :
-                                        flatCopy._circ_summary.checkout_workstation ?
-                                        flatCopy._circ_summary.checkout_workstation :
-                                        '';
                 }
                 flatCopy.index = service.index++;
-                flatCopy.copy_alert_count = copyData.copy.copy_alerts().filter(function(aca) {
-                    return !aca.ack_time();
-                }).length;
-
                 service.copies.unshift(flatCopy);
             }
 
@@ -174,18 +158,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
                 copyData.copy._inHouseUseCount = uses.length;
             });
 
-            //Get Monograph Parts
-            egCore.pcrud.search('acpm',
-                {target_copy: flatCopy.id},
-                { flesh : 1, flesh_fields : { acpm : ['part'] } },
-                {atomic :true})
-            .then(function(acpm_array) {
-                angular.forEach(acpm_array, function(acpm) {
-                    flatCopy.parts = egCore.idl.toHash(acpm.part());
-                    copyData.copy.parts = egCore.idl.toHash(acpm.part());
-                });
-            });
-
             return lastRes = {
                 copy : copyData.copy,
                 index : flatCopy.index
@@ -195,41 +167,11 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
 
     }
 
-    //all_items = selected grid rows, to be updated in place
-    service.updateInventory = function(copy_list, all_items) {
-        if (copy_list.length == 0) return;
-        return egCore.net.request(
-            'open-ils.circ',
-            'open-ils.circ.circulation.update_latest_inventory',
-            egCore.auth.token(), {copy_list: copy_list}
-        ).then(function(res) {
-            if (res) {
-                if (all_items) angular.forEach(copy_list, function(copy) {
-                    angular.forEach(all_items, function(item) {
-                        if (copy == item.id) {
-                            egCore.pcrud.search('alci', {copy: copy},
-                              {flesh: 1, flesh_fields:
-                                {alci: ['inventory_workstation']}
-                            }).then(function(alci) {
-                                //update existing grid rows
-                                item["latest_inventory.inventory_date"] = alci.inventory_date();
-                                item["latest_inventory.inventory_workstation.name"] =
-                                    alci.inventory_workstation().name();
-                            });
-                        }
-                    });
-                });
-                return all_items || res;
-            }
-        });
-    }
-
     service.add_copies_to_bucket = function(copy_list) {
         if (copy_list.length == 0) return;
 
         return $uibModal.open({
             templateUrl: './cat/catalog/t_add_to_bucket',
-            backdrop: 'static',
             animation: true,
             size: 'md',
             controller:
@@ -328,7 +270,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
             if (combined_results.length > 0) {
                 $uibModal.open({
                     template: '<eg-embed-frame url="booking_admin_url" handlers="funcs"></eg-embed-frame>',
-                    backdrop: 'static',
                     animation: true,
                     size: 'md',
                     controller:
@@ -390,7 +331,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
             if (combined_brt.length > 0 || combined_brsrc.length > 0) {
                 $uibModal.open({
                     template: '<eg-embed-frame url="booking_admin_url" handlers="funcs"></eg-embed-frame>',
-                    backdrop: 'static',
                     animation: true,
                     size: 'md',
                     controller:
@@ -423,7 +363,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
 
         return $uibModal.open({
             templateUrl: './cat/catalog/t_request_items',
-            backdrop: 'static',
             animation: true,
             controller:
                    ['$scope','$uibModalInstance','egUser',
@@ -495,7 +434,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
 
             return $uibModal.open({
                 templateUrl: './cat/catalog/t_conjoined_selector',
-                backdrop: 'static',
                 animation: true,
                 controller:
                        ['$scope','$uibModalInstance',
@@ -551,7 +489,9 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
         egCore.pcrud.search('acp',
             {deleted : 'f', id : items.map(function(el){return el.id;}) },
             { flesh : 1, flesh_fields : { acp : ['call_number'] } }
-        ).then(function() {
+        ).then(function(copy) {
+            copy_objects.push(copy);
+        }).then(function() {
 
             var cnHash = {};
             var perCnCopies = {};
@@ -601,10 +541,6 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
                     angular.forEach(items, function(cp){service.add_barcode_to_list(cp.barcode)});
                 });
             });
-        },
-        null,
-        function(copy) {
-            copy_objects.push(copy);
         });
     }
 
@@ -633,14 +569,8 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
     }
 
     service.selectedHoldingsDamaged = function (items) {
-        angular.forEach(items, function(cp) {
-            if (cp) {
-                egCirc.mark_damaged({
-                    id: cp.id,
-                    barcode: cp.barcode,
-                    refresh: cp.refresh
-                });
-            }
+        egCirc.mark_damaged(items.map(function(el){return el.id;})).then(function(){
+            angular.forEach(items, function(cp){service.add_barcode_to_list(cp.barcode)});
         });
     }
 
@@ -728,37 +658,32 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
     }
 
     service.spawnHoldingsEdit = function (items,hide_vols,hide_copies){
-        var item_ids = [];
-        angular.forEach(items, function(i){
-	    item_ids.push(i.id);
+        angular.forEach(service.gatherSelectedRecordIds(items), function (r) {
+            egCore.net.request(
+                'open-ils.actor',
+                'open-ils.actor.anon_cache.set_value',
+                null, 'edit-these-copies', {
+                    record_id: r,
+                    copies: service.gatherSelectedHoldingsIds(items,r),
+                    raw: {},
+                    hide_vols : hide_vols,
+                    hide_copies : hide_copies
+                }
+            ).then(function(key) {
+                if (key) {
+                    var url = egCore.env.basePath + 'cat/volcopy/' + key;
+                    $timeout(function() { $window.open(url, '_blank') });
+                } else {
+                    alert('Could not create anonymous cache key!');
+                }
+            });
         });
-	
-	egCore.net.request(
-	    'open-ils.actor',
-	    'open-ils.actor.anon_cache.set_value',
-	    null,
-	    'edit-these-copies',
-	    {
-	        record_id: 0,  // disables record summary
-	        copies: item_ids,
-	        raw: {},
-	        hide_vols : hide_vols,
-	        hide_copies : hide_copies
-            }).then(function(key) {
-		if (key) {
-		    var url = egCore.env.basePath + 'cat/volcopy/' + key;
-		    $timeout(function() { $window.open(url, '_blank') });
-		} else {
-		    alert('Could not create anonymous cache key!');
-		}
-	    });
     }
 
     service.replaceBarcodes = function(items) {
         angular.forEach(items, function (cp) {
             $uibModal.open({
                 templateUrl: './cat/share/t_replace_barcode',
-                backdrop: 'static',
                 animation: true,
                 controller:
                            ['$scope','$uibModalInstance',
@@ -808,7 +733,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
     // this "transfers" selected copies to a new owning library,
     // auto-creating volumes and deleting unused volumes as required.
     service.changeItemOwningLib = function(items) {
-        var xfer_target = egCore.hatch.getLocalItem('eg.cat.transfer_target_lib');
+        var xfer_target = egCore.hatch.getLocalItem('eg.cat.volume_transfer_target');
         if (!xfer_target || !items.length) {
             return;
         }
@@ -833,7 +758,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
         });
 
         var promises = [];
-        angular.forEach(vols_to_move, function(vol, vol_id) {
+        angular.forEach(vols_to_move, function(vol) {
             promises.push(egCore.net.request(
                 'open-ils.cat',
                 'open-ils.cat.call_number.find_or_create',
@@ -852,21 +777,24 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
                     'open-ils.cat.transfer_copies_to_volume',
                     egCore.auth.token(),
                     resp.acn_id,
-                    copies_to_move[vol_id]
+                    copies_to_move[vol.id]
                 );
             }));
         });
 
-        $q.all(promises)
-        .then(
-            function() {
-                angular.forEach(items, function(cp){service.add_barcode_to_list(cp.barcode)});
+        angular.forEach(
+            items,
+            function(cp){
+                promises.push(
+                    function(){ service.add_barcode_to_list(cp.barcode) }
+                )
             }
         );
+        $q.all(promises);
     }
 
     service.transferItems = function (items){
-        var xfer_target = egCore.hatch.getLocalItem('eg.cat.transfer_target_vol');
+        var xfer_target = egCore.hatch.getLocalItem('eg.cat.item_transfer_target');
         var copy_ids = service.gatherSelectedHoldingsIds(items);
         if (xfer_target && copy_ids.length > 0) {
             egCore.net.request(
@@ -906,7 +834,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
         }
     }
 
-    service.mark_missing_pieces = function(copy,outer_scope) {
+    service.mark_missing_pieces = function(copy) {
         var b = copy.barcode();
         var t = egCore.idl.toHash(copy.call_number()).record.title;
         egConfirmDialog.open(
@@ -946,7 +874,7 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
             }
 
             if (payload.letter) {
-                outer_scope.letter = payload.letter.template_output().data();
+                $scope.letter = payload.letter.template_output().data();
             }
 
             // apply patron penalty
@@ -976,12 +904,5 @@ function(egCore , egCirc , $uibModal , $q , $timeout , $window , egConfirmDialog
         });
     }
 
-    service.show_in_catalog = function(copy_list){
-        angular.forEach(copy_list, function(copy){
-            window.open('/eg/staff/cat/catalog/record/'+copy['call_number.record.id']+'/catalog', '_blank')
-        });
-    }
-
     return service;
 }])
-.filter('string_pick', function() { return function(i){ return arguments[i] || ''; }; })

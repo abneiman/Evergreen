@@ -18,6 +18,23 @@ use constant {
     CBARCODE => 'CONC4000036'
 };
 
+# Because this may run multiple times, without a DB reload, we search
+# for the workstation before registering it.  Takes an authtoken, the
+# id of the workstation lib, and the name of the workstation.
+sub find_workstation {
+    my ($authtoken, $lib, $workstation) = @_;
+    my $r = $apputils->simplereq(
+        'open-ils.actor',
+        'open-ils.actor.workstation.list',
+        $authtoken,
+        $lib
+    );
+    if ($r->{$lib}) {
+        return scalar(grep {$_->name() eq $workstation} @{$r->{$lib}});
+    }
+    return 0;
+}
+
 # Store authtokens
 my @authtoken = ();
 
@@ -29,7 +46,7 @@ $authtoken[0] = $script->authenticate({
 });
 
 # Register workstation at BR1.
-unless ($script->find_workstation(BR1_WORKSTATION, BR1_ID)) {
+unless (find_workstation($authtoken[0], BR1_ID, BR1_WORKSTATION)) {
     $script->register_workstation(BR1_WORKSTATION, BR1_ID);
 }
 
@@ -52,7 +69,7 @@ $authtoken[1] = $script->authenticate({
 });
 
 # Register workstation at BR3.
-unless ($script->find_workstation(BR3_WORKSTATION, BR3_ID)) {
+unless (find_workstation($authtoken[1], BR3_ID, BR3_WORKSTATION)) {
     $script->register_workstation(BR3_WORKSTATION, BR3_ID);
 }
 

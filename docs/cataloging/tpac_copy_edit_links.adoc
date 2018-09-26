@@ -1,5 +1,5 @@
-Accessing the Volume/Copy editor from a catalog record
-------------------------------------------------------
+TPAC Copy Edit Links
+--------------------
 
 The bibliographic record detail page displays library holdings, including the call number, shelving location, and copy barcode. Within the staff client, the holdings list now displays a new column next to the copy barcode(s). This new column contains two links, *view* and *edit*.
  

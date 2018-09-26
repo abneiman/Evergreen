@@ -1,5 +1,0 @@
-<select ng-model="ngModel">
-  <option 
-    ng-repeat="c in options track by c.value" value="{{c.value}}"
-    ng-disabled="c.disabled">{{c.label}}</option>
-</select>

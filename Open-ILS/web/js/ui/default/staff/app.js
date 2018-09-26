@@ -24,12 +24,6 @@ function($routeProvider , $locationProvider) {
         resolve : resolver
     });
 
-    $routeProvider.when('/about', {
-        templateUrl: './t_about',
-        controller: 'AboutCtrl',
-        resolve : resolver
-    });
-
     // default page 
     $routeProvider.otherwise({
         templateUrl : './t_splash',
@@ -46,12 +40,8 @@ function($routeProvider , $locationProvider) {
     /* inject services into our controller.  Spelling them
      * out like this allows the auto-magic injector to work
      * even if the code has been minified */
-           ['$scope','$location','$window','egCore','egLovefield',
-    function($scope , $location , $window , egCore , egLovefield) {
-        egLovefield.havePendingOfflineXacts() .then(function(eh){
-            $scope.pendingXacts = eh;
-        });
-
+           ['$scope','$location','$window','egCore',
+    function($scope , $location , $window , egCore) {
         $scope.focusMe = true;
         $scope.args = {};
         $scope.workstations = [];
@@ -161,22 +151,5 @@ function($routeProvider , $locationProvider) {
             '/eg/staff/cat/catalog/results?query=' + 
             encodeURIComponent($scope.cat_query);
     }
-}])
-
-.controller('AboutCtrl', [
-            '$scope','$location','egCore', 
-    function($scope , $location , egCore) {
-
-    $scope.context = {
-        server : $location.host()
-    }; 
-
-    egCore.net.request(
-        'open-ils.actor','opensrf.open-ils.system.ils_version')
-        .then(function(version) {
-            $scope.context.version = version;
-        }
-    );
-
-}])
+}]);
 

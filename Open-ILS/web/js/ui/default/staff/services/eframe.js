@@ -19,9 +19,6 @@ angular.module('egCoreMod')
             // called after onload of each new iframe page
             onchange : '=?',
 
-            // called after egFrameEmbedLoader, during link phase
-            afterload : '@',
-
             // for tweaking height
             saveSpace : '@',
             minHeight : '=?',
@@ -42,10 +39,7 @@ angular.module('egCoreMod')
             window.IEMBEDXUL = true;
             element.find('iframe').on(
                 'load',
-                function() {
-                    scope.egEmbedFrameLoader(this);
-                    if (scope.afterload) this.contentWindow[scope.afterload]();
-                }
+                function() {scope.egEmbedFrameLoader(this)}
             );
         },
 
@@ -239,48 +233,34 @@ angular.module('egCoreMod')
                                 return null;
                             }
 
-                            egCore.org.settings(['circ.staff_placed_holds_fallback_to_ws_ou'])
-                                .then(function(auth_usr_aous){
+                            // copied more or less directly from XUL menu.js
+                            var settings = {};
+                            for(var i = 0; i < user.settings().length; i++) {
+                                settings[user.settings()[i].name()] = 
+                                    JSON2js(user.settings()[i].value());
+                            }
 
-                                    // copied more or less directly from XUL menu.js
-                                    var settings = {};
-                                    for(var i = 0; i < user.settings().length; i++) {
-                                        settings[user.settings()[i].name()] = 
-                                            JSON2js(user.settings()[i].value());
-                                    }
+                            if(!settings['opac.default_phone'] && user.day_phone()) 
+                                settings['opac.default_phone'] = user.day_phone();
+                            if(!settings['opac.hold_notify'] && settings['opac.hold_notify'] !== '') 
+                                settings['opac.hold_notify'] = 'email:phone';
 
-                                    // find applicable YAOUSes for staff-placed holds
-                                    var requestor = egCore.auth.user();
-                                    var pickup_lib = user.home_ou(); // default to home ou
-                                    if (requestor.id() !== user.id()){
-                                        // this is a staff-placed hold, optionally default to ws ou
-                                        if (auth_usr_aous['circ.staff_placed_holds_fallback_to_ws_ou']){
-                                            pickup_lib = requestor.ws_ou();
-                                        }
-                                    }
+                            // Taken from patron/util.js format_name
+                            // FIXME: I18n
+                            var patron_name = 
+                                ( user.prefix() ? user.prefix() + ' ' : '') +
+                                user.family_name() + ', ' +
+                                user.first_given_name() + ' ' +
+                                ( user.second_given_name() ? user.second_given_name() + ' ' : '' ) +
+                                ( user.suffix() ? user.suffix() : '');
 
-                                    if(!settings['opac.default_phone'] && user.day_phone()) 
-                                        settings['opac.default_phone'] = user.day_phone();
-                                    if(!settings['opac.hold_notify'] && settings['opac.hold_notify'] !== '') 
-                                        settings['opac.hold_notify'] = 'email:phone';
-
-                                    // Taken from patron/util.js format_name
-                                    // FIXME: I18n
-                                    var patron_name = 
-                                        ( user.prefix() ? user.prefix() + ' ' : '') +
-                                        user.family_name() + ', ' +
-                                        user.first_given_name() + ' ' +
-                                        ( user.second_given_name() ? user.second_given_name() + ' ' : '' ) +
-                                        ( user.suffix() ? user.suffix() : '');
-
-                                    deferred.resolve({
-                                        "barcode": barcode, 
-                                        "pickup_lib": pickup_lib,
-                                        "settings" : settings, 
-                                        "user_email" : user.email(), 
-                                        "patron_name" : patron_name
-                                    });
-                                });
+                            deferred.resolve({
+                                "barcode": barcode, 
+                                "pickup_lib": user.home_ou(), 
+                                "settings" : settings, 
+                                "user_email" : user.email(), 
+                                "patron_name" : patron_name
+                            });
                         });
 
                         return deferred.promise;

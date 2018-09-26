@@ -1520,19 +1520,6 @@ package QueryParser::query_plan;
 use Data::Dumper;
 $Data::Dumper::Indent = 0;
 
-sub get_abstract_data {
-    my $self = shift;
-    my $key = shift;
-    return $self->{abstract_data}{$key};
-}
-
-sub set_abstract_data {
-    my $self = shift;
-    my $key = shift;
-    my $value = shift;
-    $self->{abstract_data}{$key} = $value;
-}
-
 sub atoms_only {
     my $self = shift;
     return @{$self->filters} == 0 &&
@@ -1754,7 +1741,7 @@ sub QueryParser {
 sub new {
     my $pkg = shift;
     $pkg = ref($pkg) || $pkg;
-    my %args = (abstract_data => {}, query => [], joiner => '&', @_);
+    my %args = (query => [], joiner => '&', @_);
 
     return bless \%args => $pkg;
 }
@@ -2089,9 +2076,6 @@ sub to_abstract_query {
     }
 
     $abstract_query->{children} ||= { QueryParser::_util::default_joiner() => $kids };
-    $$abstract_query{additional_data} = $self->{abstract_data}
-        if (keys(%{$self->{abstract_data}}));
-
     return $abstract_query;
 }
 
@@ -2316,9 +2300,6 @@ sub to_abstract_query {
         "class" => $self->classname,
         "fields" => $self->fields
     };
-
-    $self->abstract_node_additions($abstract_query)
-        if ($self->can('abstract_node_additions'));
 
     my $kids = [];
 

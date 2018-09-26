@@ -15,7 +15,8 @@ use OpenILS::Utils::TestUtils;
 my $script = OpenILS::Utils::TestUtils->new();
 
 #----------------------------------------------------------------
-# The tests...  assumes stock sample data
+# The tests...  assumes stock sample data, full-auto install by
+# eg_wheezy_installer.sh, etc.
 #----------------------------------------------------------------
 
 my $storage_ses = $script->session('open-ils.storage');

@@ -31,10 +31,10 @@
 <div class="row pad-vert">
   <div class="col-md-6">
     <div class="alert alert-danger" ng-if="copyNotFound">
-      [% l('Item Not Found') %]
+      [% l('Copy Not Found') %]
     </div>
     <div class="alert alert-success" ng-if="updateOK">
-      <span>[% l('Item Updated') %]</span>
+      <span>[% l('Copy Updated') %]</span>
       <span class="horiz-pad" ng-if="copyId">
         <a href="./cat/item/{{copyId}}/summary" target="_self">
           [% l('View Item Details') %]
